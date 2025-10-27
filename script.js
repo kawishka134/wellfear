@@ -1,4 +1,22 @@
 document.addEventListener('DOMContentLoaded', function() {
+    // Sound effects
+    const clickSound = document.getElementById('click-sound');
+    const successSound = document.getElementById('success-sound');
+    const errorSound = document.getElementById('error-sound');
+    
+    // Play sound function
+    function playSound(sound) {
+        sound.currentTime = 0;
+        sound.play().catch(e => console.log("Audio play failed:", e));
+    }
+    
+    // Add sound to all buttons
+    document.querySelectorAll('button').forEach(button => {
+        button.addEventListener('click', function() {
+            playSound(clickSound);
+        });
+    });
+    
     // Initialize tabs
     const tabs = document.querySelectorAll('.tab');
     const tabContents = document.querySelectorAll('.tab-content');
@@ -41,6 +59,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // Update existing product
             products[existingProductIndex][location] += quantity;
             showNotification(`Updated ${name} quantity in ${location}!`);
+            playSound(successSound);
         } else {
             // Add new product
             const newProduct = {
@@ -53,6 +72,7 @@ document.addEventListener('DOMContentLoaded', function() {
             
             products.push(newProduct);
             showNotification(`Added ${name} successfully!`);
+            playSound(successSound);
         }
         
         // Save to localStorage
@@ -85,8 +105,10 @@ document.addEventListener('DOMContentLoaded', function() {
         
         if (isError) {
             notification.classList.add('error');
+            playSound(errorSound);
         } else {
             notification.classList.remove('error');
+            playSound(successSound);
         }
         
         setTimeout(() => {
@@ -150,6 +172,10 @@ document.addEventListener('DOMContentLoaded', function() {
                         <button class="control-btn btn-secondary" onclick="adjustQuantity(${product.id}, 'shop', 1)">+</button>
                     </div>
                 </div>
+                <div class="action-buttons">
+                    <button class="action-btn btn-warning" onclick="openEditModal(${product.id})">Edit</button>
+                    <button class="action-btn btn-danger" onclick="openDeleteModal(${product.id})">Delete</button>
+                </div>
             `;
             productList.appendChild(productItem);
         });
@@ -168,7 +194,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 localStorage.setItem('products', JSON.stringify(products));
                 
                 // Update UI
-                document.getElementById(`${location}-${productId}`).textContent = newQuantity;
+                const quantityElement = document.getElementById(`${location}-${productId}`);
+                quantityElement.textContent = newQuantity;
+                
+                // Add animation
+                quantityElement.style.animation = 'pulse 0.3s ease';
+                setTimeout(() => {
+                    quantityElement.style.animation = '';
+                }, 300);
                 
                 // Show notification
                 const action = change > 0 ? 'increased' : 'decreased';
@@ -192,8 +225,19 @@ document.addEventListener('DOMContentLoaded', function() {
                 localStorage.setItem('products', JSON.stringify(products));
                 
                 // Update UI
-                document.getElementById(`${fromLocation}-${productId}`).textContent = products[productIndex][fromLocation];
-                document.getElementById(`${toLocation}-${productId}`).textContent = products[productIndex][toLocation];
+                const fromElement = document.getElementById(`${fromLocation}-${productId}`);
+                const toElement = document.getElementById(`${toLocation}-${productId}`);
+                
+                fromElement.textContent = products[productIndex][fromLocation];
+                toElement.textContent = products[productIndex][toLocation];
+                
+                // Add animation
+                fromElement.style.animation = 'pulse 0.3s ease';
+                toElement.style.animation = 'pulse 0.3s ease';
+                setTimeout(() => {
+                    fromElement.style.animation = '';
+                    toElement.style.animation = '';
+                }, 300);
                 
                 // Show notification
                 showNotification(`Transferred 1 ${products[productIndex].name} from ${fromLocation} to ${toLocation}!`);
@@ -202,6 +246,118 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
     };
+    
+    // Edit product modal
+    const editModal = document.getElementById('edit-modal');
+    const editForm = document.getElementById('edit-form');
+    const editCloseBtn = editModal.querySelector('.close');
+    
+    // Open edit modal
+    window.openEditModal = function(productId) {
+        let products = JSON.parse(localStorage.getItem('products')) || [];
+        const product = products.find(p => p.id === productId);
+        
+        if (product) {
+            document.getElementById('edit-product-name').value = product.name;
+            document.getElementById('edit-product-code').value = product.code;
+            document.getElementById('edit-warehouse-quantity').value = product.warehouse;
+            document.getElementById('edit-shop-quantity').value = product.shop;
+            
+            editModal.dataset.productId = productId;
+            editModal.style.display = 'block';
+        }
+    };
+    
+    // Close edit modal
+    editCloseBtn.addEventListener('click', function() {
+        editModal.style.display = 'none';
+    });
+    
+    // Edit form submission
+    editForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const productId = parseInt(editModal.dataset.productId);
+        const name = document.getElementById('edit-product-name').value;
+        const code = document.getElementById('edit-product-code').value;
+        const warehouseQuantity = parseInt(document.getElementById('edit-warehouse-quantity').value);
+        const shopQuantity = parseInt(document.getElementById('edit-shop-quantity').value);
+        
+        let products = JSON.parse(localStorage.getItem('products')) || [];
+        const productIndex = products.findIndex(p => p.id === productId);
+        
+        if (productIndex !== -1) {
+            products[productIndex].name = name;
+            products[productIndex].code = code;
+            products[productIndex].warehouse = warehouseQuantity;
+            products[productIndex].shop = shopQuantity;
+            
+            localStorage.setItem('products', JSON.stringify(products));
+            
+            // Close modal
+            editModal.style.display = 'none';
+            
+            // Re-render products
+            renderProducts();
+            
+            showNotification(`Product ${name} updated successfully!`);
+        }
+    });
+    
+    // Delete product modal
+    const deleteModal = document.getElementById('delete-modal');
+    const deleteCloseBtn = deleteModal.querySelector('.close');
+    const cancelDeleteBtn = document.getElementById('cancel-delete');
+    const confirmDeleteBtn = document.getElementById('confirm-delete');
+    let productToDelete = null;
+    
+    // Open delete modal
+    window.openDeleteModal = function(productId) {
+        productToDelete = productId;
+        deleteModal.style.display = 'block';
+    };
+    
+    // Close delete modal
+    deleteCloseBtn.addEventListener('click', function() {
+        deleteModal.style.display = 'none';
+    });
+    
+    cancelDeleteBtn.addEventListener('click', function() {
+        deleteModal.style.display = 'none';
+    });
+    
+    // Confirm delete
+    confirmDeleteBtn.addEventListener('click', function() {
+        if (productToDelete !== null) {
+            let products = JSON.parse(localStorage.getItem('products')) || [];
+            const productIndex = products.findIndex(p => p.id === productToDelete);
+            
+            if (productIndex !== -1) {
+                const productName = products[productIndex].name;
+                products.splice(productIndex, 1);
+                
+                localStorage.setItem('products', JSON.stringify(products));
+                
+                // Close modal
+                deleteModal.style.display = 'none';
+                
+                // Re-render products
+                renderProducts();
+                
+                showNotification(`Product ${productName} deleted successfully!`);
+            }
+        }
+    });
+    
+    // Close modals when clicking outside
+    window.addEventListener('click', function(event) {
+        if (event.target === editModal) {
+            editModal.style.display = 'none';
+        }
+        if (event.target === deleteModal) {
+            deleteModal.style.display = 'none';
+        }
+    });
     
     // Initial render
     renderProducts();
